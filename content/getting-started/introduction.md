@@ -1,10 +1,11 @@
 Spark is a small, dynamically typed programming language with a real toolchain:
 a handwritten lexer and parser, a bytecode compiler, a stack-based virtual
 machine with a mark-and-sweep garbage collector, and a standard library that
-covers files, JSON, regular expressions, sockets, TLS, HTTP and WebSockets.
+covers text and binary data, files, JSON, codecs, compression, dates, hashing,
+regular expressions, sockets, TLS, HTTP and WebSockets in both directions.
 
 It is implemented from scratch in C11. The only third-party dependency is
-OpenSSL, linked exclusively for TLS.
+OpenSSL, linked for TLS and for the SHA-256, HMAC and CSPRNG natives.
 
 ::: tip New to Spark?
 If you just want to see it run, jump to [Installation](@getting-started/installation)
@@ -52,6 +53,10 @@ without a package manager.
   `__index__`.
 - **Structured error handling.** `try` / `catch` / `finally` / `throw` work
   with any value, and runtime errors are catchable too.
+- **Text and bytes, kept apart.** Strings are UTF-8 text counted in characters;
+  `bytes` is an immutable byte sequence counted in bytes, with binary file and
+  socket I/O, base64/hex, DEFLATE/gzip decoding and a `bytes_builder`. The two
+  never convert implicitly.
 - **Cooperative concurrency.** `spawn`, `yield`, `join` and channels give you
   thousands of logical tasks on a single thread, with no data races.
 - **Networking that respects the scheduler.** A blocking socket call suspends

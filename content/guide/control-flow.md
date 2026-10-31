@@ -70,8 +70,8 @@ that matters for closures; see
 
 ## for-in
 
-`for-in` iterates over the elements of an array, the keys of a map or the
-characters of a string:
+`for-in` iterates over the elements of an array, the keys of a map, the
+characters of a string or the byte values of `bytes`:
 
 ```spark
 for (var value in [10, 20, 30]) {
@@ -85,9 +85,13 @@ for (var key in {"a": 1, "b": 2}) {
 for (var character in "spark") {
     print(character);
 }
+
+for (var byte in bytes_from("hi")) {
+    print(byte);          // 104, then 105
+}
 ```
 
-Arrays can yield the index and the value together:
+Arrays, strings and bytes can yield the index and the value together:
 
 ```spark
 for (var index, value in ["a", "b", "c"]) {

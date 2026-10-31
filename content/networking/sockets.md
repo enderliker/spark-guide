@@ -60,8 +60,9 @@ that may idle.
 
 | Call | Result |
 | --- | --- |
-| `sock.send(data)` | Writes all of `data`; returns the byte count. |
-| `sock.recv(max)` | Up to `max` bytes, or `nil` at end of stream. |
+| `sock.send(data)` | Writes all of `data`, a string or `bytes`; returns the byte count. |
+| `sock.recv(max)` | Up to `max` bytes as a string, or `nil` at end of stream. |
+| `sock.recv_bytes(max)` | Up to `max` bytes as `bytes`, or `nil` at end of stream. |
 | `sock.recv_line(max?)` | Up to the next newline; `nil` at end of stream. Default bound 64 KiB. |
 | `sock.wait(read?, write?, timeout_ms?)` | Waits for readability/writability; `true` when ready, `TimeoutError` on the deadline. |
 | `sock.peer()` / `sock.local()` | `{host, port}` map with the numeric peer / local address. |
@@ -85,7 +86,20 @@ socket.close();
 buffer, so it never consumes bytes past the line it returns; a later `recv`
 drains that buffer first.
 
-`recv` and `recv_line` accept at most 16 MiB. Larger values raise `ValueError`.
+A socket has no open mode: `recv` always returns text and `recv_bytes` always
+returns `bytes`, so a binary protocol never has to detour through a string.
+`send` accepts either type, and the two are never converted implicitly:
+
+```spark
+socket.send(bytes_from([0xff, 0x00, 0x41]));   // 3 bytes on the wire
+
+var frame = socket.recv_bytes(3);
+print(type(frame), bytes_to_array(frame));     // bytes [255, 0, 65]
+```
+
+`recv`, `recv_bytes` and `recv_line` accept at most 16 MiB. Larger values raise
+`ValueError`. UDP stays text-only for now: `send_to` requires a string and
+`recv_from` returns the payload as one.
 
 ## TCP servers
 
@@ -235,7 +249,7 @@ See [HTTP Client](@networking/http-client) for the HTTP-specific limits.
 
 ## Limits
 
-- `recv` / `recv_from`: at most 16 MiB.
+- `recv` / `recv_bytes` / `recv_from`: at most 16 MiB.
 - `recv_line`: at most 16 MiB; default 64 KiB.
 - Ports: `0..65535`.
 - Values waiting in a channel: 16,777,216.
@@ -247,4 +261,4 @@ See [Limits and Performance](@internals/limits-and-performance).
 - [TLS](@networking/tls) — encrypted sockets with mandatory verification.
 - [HTTP Client](@networking/http-client) — a ready-made HTTP/1.1 client.
 - [HTTP Server](@networking/http-server) — a server library written in Spark.
-- [WebSockets](@networking/websockets) — RFC 6455 clients.
+- [WebSockets](@networking/websockets) — RFC 6455 clients and servers.

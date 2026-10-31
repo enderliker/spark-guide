@@ -11,6 +11,9 @@ in full, with their output, and gives the commands for the rest.
 | `examples/echo_server.spark` | TCP server, coroutines. |
 | `examples/http_server.spark` | `lib/http.spark` server. |
 | `examples/http_client.spark` | HTTP client and `argv`. |
+| `examples/ws_echo_server.spark` | WebSocket server with `ws_accept`. |
+| `examples/ws_echo_client.spark` | WebSocket client matching the server. |
+| `examples/regex_tokenizer.spark` | Regular expressions, capture groups and offsets. |
 | `examples/discord_bot.spark` | WebSocket gateway client. |
 
 ## Hello
@@ -319,6 +322,59 @@ It prints the status, every response header and the body. HTTPS verifies the
 certificate and host name; there is no flag to disable verification. See
 [HTTP Client](@networking/http-client).
 
+## WebSocket echo
+
+The pair `examples/ws_echo_server.spark` and `examples/ws_echo_client.spark`
+talk to each other over the loopback interface:
+
+```bash
+spark examples/ws_echo_server.spark 0     # terminal 1, prints the port
+spark examples/ws_echo_client.spark ws://127.0.0.1:PORT/   # terminal 2
+```
+
+The server accepts a TCP connection, upgrades it with `ws_accept` and echoes
+every text or binary message until the client closes:
+
+```spark
+var server = tcp_listen("127.0.0.1", port);
+print("Serving ws://127.0.0.1:" + str(server.port()) + "/");
+
+while (true) {
+    var transport = server.accept();
+
+    if (transport == nil) {
+        continue;
+    }
+    try {
+        var ws = ws_accept(transport, 5000);
+
+        while (true) {
+            var frame = ws.receive();
+            if (frame == nil) {
+                break;
+            }
+            if (frame.opcode == "text") {
+                ws.send_text(frame.data);
+            } else if (frame.opcode == "binary") {
+                ws.send_binary(frame.data);
+            }
+        }
+    } catch {
+        // The client went away or broke the protocol; serve the next one.
+    }
+}
+```
+
+The client sends one message, prints the echoed frame and closes:
+
+```text
+echo: text hello from spark
+closed: nil
+```
+
+The test suite runs the pair against each other, so the example stays honest.
+See [WebSockets](@networking/websockets).
+
 ## Discord bot
 
 ```bash
@@ -339,6 +395,29 @@ It identifies, heartbeats and answers a `MESSAGE_CREATE` whose content is
 `ping`. The token stays in the environment and is never printed. See
 [WebSockets](@networking/websockets).
 
+## Regex tokenizer
+
+`examples/regex_tokenizer.spark` splits a line on whitespace, recovers each
+field's character offset and classifies it with capture groups:
+
+```bash
+spark examples/regex_tokenizer.spark
+```
+
+```text
+ 0  name    let
+ 4  name    total
+10  op      =
+12  number  3
+14  op      +
+16  number  4
+18  op      *
+20  name    count
+```
+
+The full source is on the [Files, System and Data](@stdlib/files-and-system#tokenizing-a-line)
+page, next to the regex reference it exercises.
+
 ## Running the whole set
 
 ```bash
@@ -348,5 +427,6 @@ for file in examples/*.spark; do
 done
 ```
 
-The server examples run forever, so stop them with Ctrl-C. The test suite lints
-every example and runs the network ones against local counterparts.
+The server examples run forever, so stop them with Ctrl-C, and the client
+examples need an argument (a URL or a port). The test suite lints every example
+and runs the network ones against local counterparts.

@@ -14,7 +14,7 @@ From highest to lowest:
 | `*` `/` `%` `div` | left | multiplication, float division, remainder and integer division |
 | `+` `-` | left | addition/concatenation and subtraction |
 | `<<` `>>` | left | bit shifts |
-| `<` `<=` `>` `>=` | left | comparison of numbers or strings |
+| `<` `<=` `>` `>=` | left | ordering of two numbers or two strings |
 | `in` `instanceof` | left | membership and type test |
 | `==` `!=` | left | equality |
 | `&` | left | bitwise AND |
@@ -43,9 +43,10 @@ print(2 ** 10);               // 1024
 print(2 ** -1);               // 0.5
 ```
 
-- `+` either adds two numbers or concatenates two strings. It does **not**
-  mix types: `"x" + 1` and `[1] + [2]` are `TypeError`s. Use interpolation or
-  `str(x)` to build text.
+- `+` either adds two numbers, concatenates two strings or concatenates two
+  `bytes`. It does **not** mix types: `"x" + 1`, `[1] + [2]` and
+  `bytes_from("a") + "b"` are `TypeError`s. Use interpolation or `str(x)` to
+  build text, and `bytes_from(x)` to build bytes.
 - `div` requires two integers and truncates toward zero.
 - Division or remainder by zero raises `ZeroDivisionError`.
 - `**` is right-associative: `2 ** 3 ** 2` is `512`.
@@ -64,9 +65,16 @@ print("literal dollar: $$5");         // literal dollar: $5
 Interpolation accepts any expression and converts it with the same rules as
 `str`. `$$` escapes a dollar sign. See [Strings](@guide/strings).
 
+`bytes + bytes` is the binary counterpart: it appends one byte sequence to
+another, and mixing a string in is a `TypeError`.
+
+```spark
+print(bytes_from("spark") + bytes_from("!"));   // b"spark!"
+```
+
 ## Comparison
 
-Numbers and strings can be compared with `<`, `<=`, `>`, `>=`. Both operands
+Numbers and strings can be ordered with `<`, `<=`, `>`, `>=`. Both operands
 must be comparable with each other; comparing a number with a string is a
 `TypeError`.
 
@@ -75,8 +83,15 @@ print(1 < 2, 2 <= 2, "apple" < "banana");   // true true true
 print(1 == 1.0, "a" != "b");                // true true
 ```
 
-Equality uses content for strings and numbers and identity for objects. See
+`bytes` has **no ordering**: there is no `<` for two byte sequences, so sort
+binary data with an explicit comparator. Equality is another matter — strings, numbers
+and bytes compare by content, while objects compare by identity. See
 [Types and Values](@guide/types-and-values).
+
+```spark
+print(bytes_from("spark") == bytes_from("spark"));   // true
+print(bytes_from("spark") == "spark");               // false — different types
+```
 
 ## Logic
 
@@ -126,15 +141,21 @@ print(a ? b : c ? d : e);      // a ? b : (c ? d : e)
 
 ## Membership and type tests
 
-`in` tests an array by value, a string by substring and a map by key. Any
-other container is a runtime error.
+`in` tests an array by value, a string by substring, a map by key and `bytes`
+by byte value or byte subsequence. Any other container is a runtime error.
 
 ```spark
 print("a" in ["a", "b"]);          // true
 print("ar" in "spark");            // true
 print("k" in {"k": 1});            // true
 print(3 in [1, 2]);                // false
+print(0x73 in bytes_from("spark"));               // true  — a byte value
+print(bytes_from("par") in bytes_from("spark"));  // true  — a subsequence
 ```
+
+The needle for `bytes` must be an integer in `0..255` or another `bytes`; a
+string is a `TypeError`, since text and bytes never convert implicitly. Byte
+offsets are counted in bytes, not characters.
 
 `instanceof` tests whether the left operand is an instance of the class on the
 right, subclasses included. `nil` and non-instances yield `false`, not an error.
@@ -207,9 +228,10 @@ var a = [1, 2, 3, 4, 5];
 print(a[0], a[-1]);       // 1 5
 ```
 
-`value[start:end:step]` builds a new array or string from `[start, end)` taken
-every `step` elements. Every part is optional, negative positions count from
-the end, and out-of-range positions are **clamped** rather than raising.
+`value[start:end:step]` builds a new array, string or `bytes` from
+`[start, end)` taken every `step` elements. Every part is optional, negative
+positions count from the end, and out-of-range positions are **clamped** rather
+than raising.
 
 ```spark
 print(a[1:3]);            // [2, 3]
@@ -220,11 +242,22 @@ print(a[::-1]);           // [5, 4, 3, 2, 1]
 print(a[10:20]);          // []
 print("spark"[1:3]);      // pa
 print("spark"[::-1]);     // kraps
+print(bytes_from("spark")[1:3]);   // b"pa"
+```
+
+`bytes` indexing yields an integer in `0..255` rather than a one-byte `bytes`
+value, and a slice of `bytes` is a new `bytes`. Slicing counts bytes, not
+characters:
+
+```spark
+var raw = bytes_from("ñandú");
+print(len(raw), raw[0], raw[-1]);   // 7 195 186
+print(raw[0:2]);                    // b"\xc3\xb1"
 ```
 
 The rule to remember: **indexing is exact and raises; slicing clamps**. The
 step must not be `0`. A slice is a value, not a place, so `a[1:3] = x` is a
-syntax error. Only arrays and strings can be sliced.
+syntax error. Only arrays, strings and bytes can be sliced.
 
 ## Assignment operators
 

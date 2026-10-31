@@ -40,11 +40,11 @@ same expression can dispatch to a user function. See
 | Category | Page | Examples |
 | --- | --- | --- |
 | Values, types, conversion | this page | `type`, `str`, `int`, `assert`, `copy` |
-| Text | [Text](@stdlib/text) | `substr`, `split`, `trim`, `pad_start` |
-| Collections | [Collections](@stdlib/collections) | `push`, `sort_by`, `map`, `reduce` |
-| Numbers and math | [Numbers and Math](@stdlib/numbers-and-math) | `abs`, `sqrt`, `min`, `randint` |
-| Files and system | [Files, System and Data](@stdlib/files-and-system) | `read_file`, `exec`, `to_json` |
-| Networking | [Networking](@networking/sockets) | `tcp_connect`, `http_get`, `ws_connect` |
+| Text | [Text](@stdlib/text) | `substr`, `split`, `format`, `pad_start` |
+| Collections | [Collections](@stdlib/collections) | `push`, `sort`, `map`, `reduce` |
+| Numbers and math | [Numbers and Math](@stdlib/numbers-and-math) | `abs`, `sqrt`, `clamp`, `randint` |
+| Files, system, binary data and codecs | [Files, System and Data](@stdlib/files-and-system) | `read_file`, `bytes_from`, `base64_encode`, `sha256`, `inflate`, `to_json` |
+| Networking | [Networking](@networking/sockets) | `tcp_connect`, `http_get`, `ws_accept` |
 
 ## Values, types and conversion
 
@@ -57,7 +57,10 @@ same expression can dispatch to a user function. See
 | `is_int(x)` | Whether the value is an integer. |
 | `is_nan(x)` | Whether the value is IEEE 754 NaN. |
 | `type(x)` | Type name; a class name for instances. |
-| `len(x)` | Length of a string (characters), array, map; `__len__` on instances. |
+| `len(x)` | Length of a string (characters), bytes (bytes), array or map; `__len__` on instances. |
+| `bytes(n)` / `bytes_from(x)` | New `bytes`: `n` zero bytes, or the bytes of an array of integers in `0..255` or of a string's UTF-8 encoding. |
+| `to_string(b)` / `to_bytes(s)` | Convert between `bytes` and text; `to_string` rejects invalid UTF-8 with byte offset. |
+| `bytes_to_array(b)` | Array with one integer in `0..255` per byte. |
 | `assert(cond, message?)` | Stops the program when the condition is falsey. |
 | `copy(value)` | Shallow copy of an array or map; other values are returned unchanged. |
 | `isinstance(x, Class)` | Class or subclass test; a type-name string also works. |
@@ -73,16 +76,24 @@ var a = [1, 2];
 var b = copy(a);
 push(b, 3);
 print(a, b);                                        // [1, 2] [1, 2, 3]
+
+var raw = bytes_from("hi");
+print(type(raw), len(raw), to_string(raw));         // bytes 2 hi
+print(bytes_to_array(bytes_from([0xff, 0x00])));    // [255, 0]
 ```
 
 ::: note `type()` for numbers
 Both integers and floats report `"number"`. Use `is_int(x)` to tell them apart.
 :::
 
+The other type names are `"nil"`, `"bool"`, `"bytes"`, `"class"`, `"file"`,
+`"string_builder"`, `"bytes_builder"`, `"coroutine"`, `"channel"`, `"socket"`,
+`"server"` and `"websocket"`.
+
 ## Callbacks
 
 The higher-order natives — `map`, `filter`, `reduce`, `each`, `any`, `all` and
-`sort_by` — accept either a closure or another native:
+`sort` (or its alias `sort_by`) — accept either a closure or another native:
 
 ```spark
 print(map([1, 2, 3], fn(x) => x * 2));   // [2, 4, 6]
@@ -120,17 +131,19 @@ The exact behavior of each function is documented on its category page.
 | --- | --- |
 | `pi` | The constant π. |
 | `nan` | IEEE 754 NaN. |
+| `inf` | Positive infinity. |
 | `argv` | Script path and arguments; empty in the REPL. |
 | `_` | REPL only: result of the last expression statement. |
 
 ## Optional arguments
 
 Several natives have optional trailing arguments (`substr(text, start,
-count?)`, `get(map, key, default?)`, `range(start, end)`), and a few are
-variadic (`print`, `min`, `max`, `spawn`). Optional arguments may be omitted or
-passed as `nil` where the documentation says so; a missing default is not
-always the same as an explicit `nil` (for example, `http_get` treats `nil` as
-"use the default").
+count?)`, `get(map, key, default?)`, `range(start, end, step?)`,
+`round(x, digits?)`, `split(text, sep, limit?)`, `trim(text, chars?)`,
+`sort(array, comparator?)`), and a few are variadic (`print`, `min`, `max`,
+`format`, `spawn`). Optional arguments may be omitted or passed as `nil` where
+the documentation says so; a missing default is not always the same as an
+explicit `nil` (for example, `http_get` treats `nil` as "use the default").
 
 ## Next
 

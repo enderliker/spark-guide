@@ -14,11 +14,14 @@ helpers. The language-level guides are [Arrays](@guide/arrays) and
 | `reverse(a)` | Reverses in place; returns the array. |
 | `fill(a, value)` | Sets every element to `value`; returns the array. |
 | `slice(a, start, end?)` | New array for `[start, end)` with clamping. |
-| `range(n)` / `range(start, end)` | Array of integers in `[start, end)`. |
+| `range(n)` / `range(start, end)` / `range(start, end, step)` | Array of integers in `[start, end)`. |
 | `contains(a, value)` | Membership by `==`. |
 | `index_of(a, value)` | First index, or `-1`. |
+| `count(a, value)` | Number of elements equal to `value`. |
 | `sort(a)` | Stable in-place sort of numbers or strings. |
-| `sort_by(a, fn)` | Stable in-place sort with a comparator. |
+| `sort(a, comparator)` / `sort_by(a, fn)` | Stable in-place sort with a comparator. |
+| `shuffle(a)` | Shuffles in place (Fisher-Yates); returns the array. |
+| `choice(a)` | A random element of a non-empty array. |
 | `map(a, fn)` / `filter(a, fn)` | Transform / select into a new array. |
 | `reduce(a, fn, initial?)` | Left fold with `fn(acc, x)`. |
 | `each(a, fn)` | Calls `fn(x)` for each element; returns `nil`. |
@@ -35,6 +38,7 @@ print(len(a));             // 3
 print(a.len());            // 3
 print(contains(a, 2));     // true
 print(index_of(a, 1));     // 1
+print(count(a, 1));        // 1
 
 push(a, 4);
 print(a);                  // [3, 1, 2, 4]
@@ -53,29 +57,50 @@ print(a);                  // [9, 1, 2]
 print(range(5));           // [0, 1, 2, 3, 4]
 print(range(2, 6));        // [2, 3, 4, 5]
 print(range(0));           // []
+print(range(0, 10, 3));    // [0, 3, 6, 9]
+print(range(5, 0, -2));    // [5, 3, 1]
 ```
 
-`range(start, end)` is exclusive at the end and returns `[]` when `start >=
-end`.
+`range(start, end, step?)` is exclusive at the end and returns `[]` when the
+step points away from `end`, so `range(5, 0, 1)` and `range(0, 5, -1)` are both
+empty. A step of `0` is a `ValueError`.
 
-### sort and sort_by
+### sort, sort_by, shuffle and choice
 
 ```spark
 var numbers = [10, 2, 33, 4];
 sort(numbers);
 print(numbers);            // [2, 4, 10, 33]
 
+print(sort([3, 1, 2], fn(a, b) { return a > b; }));   // [3, 2, 1]
+
 var words = ["pear", "fig", "banana"];
 sort_by(words, fn(a, b) => len(a) < len(b));
 print(words);              // ["fig", "pear", "banana"]
 ```
 
-- `sort` accepts only all-numbers or all-strings; mixing types is an error.
-- The sort is a stable merge sort, O(n log n).
-- `sort_by`'s comparator returns truthy when `a` must come before `b`.
-- Both sort in place and return the array.
+- `sort` without a comparator accepts only all-numbers or all-strings; mixing
+  types is an error.
+- `sort(a, comparator)` and `sort_by(a, fn)` are the same call — `sort_by` is
+  kept as an alias. The comparator returns truthy when `a` must come before `b`.
+- The sort is a stable merge sort, O(n log n), and sorts in place, returning the
+  array. Equal elements keep their original order.
 - Membership and default sorting use primitive equality and ordering, not
   `__eq__` / `__lt__`, for instances.
+
+`shuffle` and `choice` draw from the same PRNG as `rand`, so `srand(seed)`
+makes their sequence reproducible:
+
+```spark
+srand(7);
+var deck = range(5);
+shuffle(deck);
+print(sort(deck));    // [0, 1, 2, 3, 4] — the same values, in random order
+print(choice(["rock", "paper", "scissors"]));
+```
+
+`shuffle` returns the same array it reordered; `choice` on an empty array is a
+`ValueError`.
 
 ### Higher-order helpers
 
@@ -175,14 +200,22 @@ for (var name in names) {
 - Arrays and maps are reference values; `copy` is shallow.
 - Indexing is exact and raises `IndexError` when out of range; slicing clamps.
 - `len` on an instance calls `__len__`.
-- `contains` and `index_of` also work on strings (substring / character
-  position).
+- `contains`, `count` and `index_of` also work on strings (substring /
+  character position) and on `bytes` (a byte value or a byte subsequence).
+  On a map, `count` counts **values**, not keys.
 - `in` uses the same rules as `contains`.
+- `bytes` values compare by content, so they work in `contains`, `index_of` and
+  as map keys, but `sort` has no natural order for them; pass a comparator
+  (`sort(chunks, fn(a, b) => len(a) < len(b))`) when you need an order.
 
 ```spark
 print("a" in {"a": 1});     // true
 print(2 in [1, 2]);         // true
 print("ar" in "spark");     // true
+print(count({"a": 1, "b": 1}, 1));   // 2 — map values
+
+var chunks = [bytes_from("a"), bytes_from("b")];
+print(contains(chunks, bytes_from("b")));   // true
 ```
 
 ## Common patterns

@@ -33,25 +33,43 @@ exponents, not hex literals.
 | --- | --- |
 | `floor(x)` | Largest integer not greater than `x`. |
 | `ceil(x)` | Smallest integer not less than `x`. |
-| `round(x)` | Nearest integer, halfway cases away from zero. |
+| `trunc(x)` | Nearest integer toward zero. |
+| `round(x, digits?)` | Nearest integer, halfway cases away from zero; with `digits`, that many decimal places. |
 | `abs(x)` | Absolute value. |
 
-An integer input is returned unchanged. The result of `floor`, `ceil` and
-`round` is an integer.
+An integer input is returned unchanged. The result of `floor`, `ceil`, `trunc`
+and `round` without `digits` is an integer.
 
 ```spark
 print(floor(2.9), ceil(2.1), round(2.5));   // 2 3 3
+print(trunc(2.7), trunc(-2.7));              // 2 -2
 print(round(-2.5));                          // -3
 print(abs(-7), abs(-7.5));                   // 7 7.5
 print(floor(5));                             // 5
 ```
+
+`round(x, digits)` scales by a power of ten and rounds back, and `digits` must
+be between `0` and `15`:
+
+```spark
+print(round(3.14159, 2));   // 3.14
+print(round(2.5, 1));       // 2.5
+print(round(-2.55, 1));     // -2.6
+```
+
+Because the scaling happens in binary floating point, a decimal that has no
+exact binary form can surprise you: `round(1.005, 2)` is `1`, and
+`round(2.675, 2)` is `2.68`. For display, prefer `format("%.2f", x)`, which
+formats without changing the value.
 
 ## Powers and roots
 
 | Call | Result |
 | --- | --- |
 | `sqrt(x)` | Square root; `ValueError` on a negative input. |
+| `cbrt(x)` | Cube root; a negative input is allowed. |
 | `pow(x, y)` | `x` raised to `y`; equivalent to `x ** y`. |
+| `hypot(x, y)` | `sqrt(x*x + y*y)` without intermediate overflow. |
 
 ```spark
 print(sqrt(81));        // 9
@@ -60,31 +78,60 @@ print(2 ** 10);         // 1024
 print(2 ** -1);         // 0.5
 print((-2) ** 2);       // 4
 print(-2 ** 2);         // 4 — unary minus binds tighter than **
+print(cbrt(-27), cbrt(8));    // -3 2
+print(hypot(3, 4));           // 5
 ```
 
 ::: warning `sqrt(-1)` is an error
 `sqrt` raises `ValueError` instead of returning NaN. Use `is_nan` to test
 values that come from other computations, and check the sign before calling
-`sqrt`.
+`sqrt`. `cbrt` is the exception: it accepts negative inputs.
 :::
 
 ## Trigonometry and logarithms
 
 | Call | Result |
 | --- | --- |
-| `sin(x)` / `cos(x)` | Sine and cosine in radians. |
-| `log(x)` | Natural logarithm. |
+| `sin(x)` / `cos(x)` / `tan(x)` | Trigonometric functions in radians. |
+| `asin(x)` / `acos(x)` | Inverse functions; input outside `[-1, 1]` is a `ValueError`. |
+| `atan(x)` / `atan2(y, x)` | Inverse tangent of one value, or of `y/x` with the correct quadrant. |
+| `log(x)` / `log2(x)` / `log10(x)` | Natural, base-2 and base-10 logarithms; a non-positive argument is a `ValueError`. |
 | `exp(x)` | e raised to `x`. |
 
+All of them return a float, even for integral results.
+
 ```spark
-print(sin(0), cos(0));          // 0 1
-print(log(exp(1)));             // 1
-print(exp(0));                  // 1
+print(sin(0), cos(0), tan(0));          // 0 1 0
+print(asin(1), acos(0));                // 1.5707963267949 1.5707963267949
+print(atan(1), atan2(1, 1));            // 0.785398163397448 0.785398163397448
+print(log(exp(1)));                     // 1
+print(log2(8), log10(1000));            // 3 3
+print(exp(0));                          // 1
 ```
 
-Only the functions listed here are provided. There is no `tan`, `atan2`,
-`log10` or hyperbolic family in 0.1.0; the [roadmap](@appendix/roadmap) tracks
-a larger math surface.
+`atan2(y, x)` is the one to reach for when the signs of both coordinates
+matter: for the point with `x = -1` and `y = 1`, `atan2(1, -1)` is `3π/4`,
+while `atan(1 / -1)` is only `-π/4` — the single-argument form cannot tell
+which quadrant the point is in.
+
+## Integer helpers
+
+| Call | Result |
+| --- | --- |
+| `sign(x)` | `-1`, `0` or `1` as an integer; `nan` is a `ValueError`. |
+| `clamp(x, low, high)` | `x` limited to `[low, high]`; returns whichever of the three values wins. |
+| `gcd(a, b)` / `lcm(a, b)` | Greatest common divisor and least common multiple of two integers. |
+
+```spark
+print(sign(-3), sign(0), sign(2.5));         // -1 0 1
+print(clamp(15, 0, 10), clamp(-5, 0, 10));   // 10 0
+print(gcd(12, 18), gcd(-12, 18), lcm(4, 6)); // 6 6 12
+```
+
+`gcd` and `lcm` use the magnitudes, so the result is never negative. A
+non-integer argument, `low > high`, or an `lcm` result outside the 64-bit range
+is a `ValueError`; `clamp` returns the winning argument unchanged, integer or
+float.
 
 ## Minimum, maximum and sum
 
@@ -145,17 +192,17 @@ significant digits. Do not use printed output to verify float equality; use
 an explicit tolerance.
 :::
 
-There is no `printf`-style precision control in the standard library. For
-fixed decimals, round and format manually:
+For fixed decimals or aligned columns, use `format`. It lays out the text
+without changing the value, which is what you want at the edge of a program:
 
 ```spark
-fn fixed(value, digits) {
-    var scale = pow(10, digits);
-    return str(round(value * scale) / scale);
-}
-
-print(fixed(3.14159, 2));   // 3.14
+print(format("%.2f", 3.14159));     // 3.14
+print(format("%8.3f", -3.14159));   //   -3.142
+print(format("%08.3f", -3.14159));  // -003.142
+print(format("%g", 0.0000123));     // 1.23e-05
 ```
+
+See [Text](@stdlib/text#formatting) for the full specifier table.
 
 ::: warning Floating-point money
 Do not store money in floats. Use integer cents (`1999`) and format at the
@@ -200,6 +247,10 @@ print(dice >= 1 and dice <= 6);   // true
 | --- | --- |
 | `pi` | π |
 | `nan` | IEEE 754 NaN |
+| `inf` | Positive infinity; `-inf` is its negation. |
+
+`inf` is an ordinary float — `is_nan(inf)` is `false`, `inf > 1e308` is `true`,
+and `inf - inf` is NaN. Domain errors still raise rather than returning it.
 
 ## Next
 

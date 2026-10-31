@@ -132,12 +132,15 @@ print(values);                   // [0, 0, 0]
 ```
 
 `sort` sorts numbers or strings in place using a stable merge sort. Mixing
-numbers and strings is an error. Use `sort_by` for custom ordering:
+numbers and strings is an error. Pass a comparator for any other ordering —
+`sort_by` is the same call:
 
 ```spark
 var words = ["pear", "fig", "banana"];
 sort_by(words, fn(a, b) => len(a) < len(b));
 print(words);                    // ["fig", "pear", "banana"]
+
+print(sort([3, 1, 2], fn(a, b) { return a > b; }));   // [3, 2, 1]
 ```
 
 The comparator returns truthy when `a` must come before `b`. Sorting is stable.

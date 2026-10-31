@@ -99,18 +99,21 @@ print("spark" == "spark");    // true
 | --- | --- |
 | `len(s)` | Number of UTF-8 characters. |
 | `substr(s, start, count?)` | Substring by characters; a negative start counts from the end. |
-| `split(s, sep)` | Array of parts; an empty separator splits into characters. |
+| `split(s, sep, limit?)` | Array of parts; an empty separator splits into characters, and `limit` caps the field count. |
 | `join(array, sep)` | Joins stringified elements. |
-| `trim(s)` | Removes leading and trailing ASCII whitespace. |
+| `format(template, args...)` | printf-style text from a template and positional arguments. |
+| `trim(s, chars?)` | Removes leading and trailing ASCII whitespace, or any of the whole characters in `chars`. |
 | `upper(s)` / `lower(s)` | ASCII case conversion. |
 | `repeat(s, n)` | `s` repeated `n` times. |
 | `replace(s, old, new)` | Replaces every occurrence. |
 | `starts_with(s, prefix)` / `ends_with(s, suffix)` | Prefix/suffix test. |
 | `contains(s, sub)` | Substring test. |
 | `index_of(s, sub)` | First character position or `-1`. |
+| `count(s, sub)` | Non-overlapping occurrences of `sub`; an empty `sub` is `len(s) + 1`. |
 | `chr(code)` / `ord(s)` | Unicode code point conversions. |
 | `pad_start(s, width, fill?)` / `pad_end(...)` | Pad to a character width. |
 | `slice(s, start, end?)` | Substring with clamping (no step). |
+| `to_bytes(s)` | The string's UTF-8 bytes as a `bytes` value. |
 
 ```spark
 var s = "  Hello, World  ";
@@ -126,8 +129,10 @@ print(substr("abcdef", -3));     // def
 print(substr("abcdef", -2, 1));  // e
 ```
 
-`upper` and `lower` only change ASCII letters, and `trim` only removes ASCII
-whitespace; other characters are left untouched. `substr` requires a
+`upper` and `lower` only change ASCII letters, and `trim` without `chars` only
+removes ASCII whitespace; other characters are left untouched. `trim(s, chars)`
+strips any of the given characters from both ends, removing each whole UTF-8
+character, so `trim("ñandú", "ñú")` is `"and"`. `substr` requires a
 non-negative `count`, and a `start` past the end returns `""`.
 
 All of these also work as methods on the string: `s.trim()`, `s.split(",")`,
@@ -185,9 +190,22 @@ print(chr(0x1F600));      // 😀
 print(len(chr(0x1F600))); // 1
 ```
 
-Invalid UTF-8 cannot be represented in a Spark string. Binary data belongs on
-the wire (sockets) or in files; the upcoming `bytes` type is tracked in the
-[roadmap](@appendix/roadmap).
+Spark strings are text: a value written as a literal is always valid UTF-8.
+Binary data that is not valid UTF-8 belongs in a `bytes` value, which counts
+positions in bytes and indexes integer values (see
+[Types and Values](@guide/types-and-values#bytes-are-binary-values)):
+
+```spark
+var text = "héllo";
+var raw = text.to_bytes();        // 6 bytes
+print(len(text), len(raw));       // 5 6
+print(to_string(raw) == text);    // true
+print(bytes_to_array("A".to_bytes()));  // [65]
+```
+
+`to_string(bytes)` validates UTF-8 and raises `ValueError` naming the byte
+offset when the payload is not text, so the conversion never silently mangles
+data. There is no implicit conversion in either direction.
 
 ## Recipes
 

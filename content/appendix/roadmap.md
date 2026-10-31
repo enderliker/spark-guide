@@ -1,40 +1,42 @@
 This page records where Spark stands and what the project intends to do next.
-It summarizes `CHANGELOG.md` and `tasks/plan.md`; the plan is the source of
-truth when the two disagree.
+It summarizes `CHANGELOG.md`, `tasks/plan.md` and the task notes in
+`tasks/todo.md`; the notes are the live status when the three disagree.
 
 ## Current status
 
 **Spark 0.1.0** was released on 2026-10-27 with the language core, the standard
-library, the tooling and the collector. A second stream that was still
-unreleased at the time of writing adds coroutines, channels, sockets, TLS, the
-HTTP client, the Spark HTTP server library and the WebSocket client. That work
-is in the tree and in the test suite, and it is what this wiki documents.
+library, the tooling and the collector. A second, still unreleased stream adds
+coroutines, channels, sockets, TLS, the HTTP client, the Spark HTTP server
+library, WebSockets in both directions, the `bytes` type, binary I/O, the
+codecs, compression, dates, cryptography and the full regular-expression
+engine. That work is in the tree and in the test suite, and it is what this wiki
+documents.
 
 | Area | State |
 | --- | --- |
 | Language core | Complete for 0.1.0. |
 | Classes, closures, exceptions, modules | Complete. |
-| Standard library | Text, collections, math, files, system, JSON, regex, builders. |
+| Standard library | Text, collections, math, binary data, files, system, JSON, codecs, compression, dates, crypto, regex, builders. |
 | Coroutines and channels | Implemented in the unreleased stream. |
 | TCP/UDP, TLS, HTTP client | Implemented; TLS verifies by default. |
 | HTTP server | `lib/http.spark`, written in Spark; one connection at a time. |
-| WebSocket | Client only. No server yet. |
+| WebSocket | Client and server. |
 | Debugger, formatter, linter, bytecode files | Complete. |
-| Test suite | 243 tests, including offline network fixtures. |
+| Test suite | 340 tests, including offline network fixtures. |
 
 The measured reference on the development machine (WSL2, shared) is a `fib(27)`
-minimum around **4.95 ms** against a gate of **5 ms**, with all 243 tests
-passing and clean AddressSanitizer/UndefinedBehaviorSanitizer runs.
+minimum around **5.03 ms** against a gate of **5 ms**, with all 340 tests
+passing and clean AddressSanitizer/UndefinedBehaviorSanitizer runs. The gate is
+close enough to the machine's noise floor that a run can drift a fraction over
+5 ms; the phase checkpoints record the numbers they were reviewed with.
 
 ## Known gaps
 
-These are the limits you will meet while using 0.1.0.
+These are the limits in the current build: 0.1.0 plus the unreleased stream
+described above.
 
 ### Language
 
-- No binary type. `string` is UTF-8 text; holding arbitrary bytes in it is not
-  supported. This is why the WebSocket server is missing: frame handling needs a
-  byte buffer.
 - No insertion-order guarantee for maps. Iteration order is unspecified;
   `keys(map)` must be sorted when order matters.
 - No loop `else`, no `break value`, no multiple assignment.
@@ -50,14 +52,17 @@ These are the limits you will meet while using 0.1.0.
 
 ### Libraries
 
-- The regex engine is a Pike VM with leftmost-longest semantics. It has no
-  `{n,m}` quantifiers, no lazy quantifiers, no capture groups and no `\b`.
-- No base64/hex codecs, no date formatting, no hashing or randomness beyond
-  `rand`/`srand`.
+- The regex engine has no `\b`, no lookaround and no backreferences, and
+  character classes are byte sets, so a class can split a multibyte character.
+  Case folding is ASCII only.
+- `bytes` has no ordering: sort binary data with an explicit comparator.
+- Compression is decode-only: there is no compressor and no zlib (RFC 1950)
+  wrapper, and only the first gzip member is decoded.
 - The HTTP client is synchronous and blocks the process; it does not yield its
   coroutine. There is no gzip, no keep-alive and no connection reuse.
-- The Spark HTTP server handles one connection at a time and has no keep-alive.
-- No WebSocket server, no `permessage-deflate`, no reconnect helper.
+- The Spark HTTP server handles one connection at a time, has no keep-alive and
+  serves text bodies only.
+- WebSockets have no `permessage-deflate` and no reconnect helper.
 
 ### Runtime
 
@@ -76,43 +81,49 @@ The 0.2 stream is organized in phases. Each phase ends at a green checkpoint
 (build, tests, sanitizers, benchmark gate) and phases are independently
 shippable, so lower-priority work can be cut without leaving half a feature.
 
-| Phase | Priority | Scope |
-| --- | --- | --- |
-| 21. Coherence | P0 | Reference fixes, English-only artifacts, error-message corrections. |
-| 22. `bytes` | P1 | Immutable byte strings, binary file and socket I/O, WebSocket server. |
-| 23. Libraries | P1 | Base64/hex, inflate, `format`, dates, SHA-256/HMAC, full regex, math and text conveniences. |
-| 24. Network hardening | P1 | gzip, keep-alive, coroutine-aware HTTP client, concurrent HTTP server. |
-| 25. Ergonomics | P2 | Loop `else`, `break value`, multiple assignment, object protocols, error traces, ordered maps, getters and `enum`. |
-| 26. Performance | P2/P3 | Arena allocator, GC observability and generations, global-path superinstructions, cheaper coroutines, LTO/PGO. |
-| 27. Tooling | P3 | `--check`/`-e`/`--time`, REPL editing, tree-sitter grammar, embedding header, module namespaces, fuzzing. |
+| Phase | Priority | Scope | State |
+| --- | --- | --- | --- |
+| 21. Coherence | P0 | Reference fixes, English-only artifacts, error-message corrections. | Done |
+| 22. `bytes` | P1 | Immutable byte strings, binary file and socket I/O, WebSocket server. | Done |
+| 23. Libraries | P1 | Base64/hex, inflate, `format`, dates, SHA-256/HMAC, full regex, math and text conveniences. | Done |
+| 24. Network hardening | P1 | gzip, keep-alive, coroutine-aware HTTP client, concurrent HTTP server. | Next |
+| 25. Ergonomics | P2 | Loop `else`, `break value`, multiple assignment, object protocols, error traces, ordered maps, getters and `enum`. | Planned |
+| 26. Performance | P2/P3 | Arena allocator, GC observability and generations, global-path superinstructions, cheaper coroutines, LTO/PGO. | Planned |
+| 27. Tooling | P3 | `--check`/`-e`/`--time`, REPL editing, tree-sitter grammar, embedding header, module namespaces, fuzzing. | Planned |
 
-Phase 21 is complete. The others are planned; the checkboxes in `tasks/plan.md`
-are the live status.
+Phases 21, 22 and 23 are complete and closed with green checkpoints: suite and
+sanitizers clean, and the `fib(27)` minimum unchanged. Phase 24 is next; the
+checkboxes in `tasks/plan.md` and the notes in `tasks/todo.md` are the live
+status.
 
-### The `bytes` type
+### What phases 22 and 23 landed
 
-A first-class immutable byte-string object, sibling of `string` rather than a
-reinterpretation of it. Indexing yields integers `0..255`, `len` counts bytes,
-equality is by content, and `bytes_builder()` provides mutation. `string` keeps
-its UTF-8 character semantics, so no existing program changes meaning, and the
-two types are never converted implicitly; mixed operations raise `TypeError`
-naming `to_bytes`/`to_string`.
+**The `bytes` type** is a first-class immutable byte-string object, a sibling of
+`string` rather than a reinterpretation of it. Indexing yields integers
+`0..255`, `len` counts bytes, equality is by content, and `bytes_builder()`
+provides mutation. `string` keeps its UTF-8 character semantics, so no existing
+program changes meaning, and the two types are never converted implicitly; mixed
+operations raise `TypeError` naming the explicit bridges (`bytes_from`,
+`to_string`, `to_bytes`). It unlocked binary file and socket I/O and the
+WebSocket server.
 
-This unblocks binary file and socket I/O and the WebSocket server.
+**The libraries** that shipped with it:
 
-### Libraries
-
-- `base64_encode`/`base64_decode`, `hex_encode`/`hex_decode`.
-- Deflate/gzip decode with a vendored `inflate` in `src/codec.c`; no zlib
-  dependency and a decompression size cap.
+- `base64_encode`/`base64_decode` and `hex_encode`/`hex_decode`.
+- Deflate/gzip decode with a vendored inflate in `src/codec.c`; no zlib
+  dependency, and a 16 MiB cap on the output.
 - `format` with printf-style placeholders.
-- Date/time formatting and parsing.
-- `sha256`, `hmac_sha256` and `rand_bytes` through OpenSSL.
+- Date/time formatting and parsing in `src/datetime.c`, UTC by default.
+- `sha256`, `sha256_hex`, `hmac_sha256` and `rand_bytes` through OpenSSL.
 - Regex: `{n,m}`, lazy quantifiers, flags, match offsets, capture groups,
-  `regex_split`, and group references in `regex_replace`. The engine moves to
-  Perl/JavaScript leftmost-first semantics, which is a documented breaking
-  change for alternation patterns such as `a|ab`.
-- Math natives, plus string and collection conveniences.
+  `regex_split`, and group references in `regex_replace`. The engine now uses
+  Perl/JavaScript leftmost-first semantics, a documented breaking change for
+  alternation patterns such as `a|ab`.
+- Math natives (`tan`, `atan2`, `log2`, `log10`, `cbrt`, `hypot`, `trunc`,
+  `sign`, `clamp`, `gcd`, `lcm`, `round(x, digits?)`) and the constants `inf`,
+  plus the string and collection conveniences (`format`, `count`, `split` with a
+  limit, `trim` with a character set, `range` with a step, `sort` with a
+  comparator, `shuffle`, `choice`).
 
 ### Networking
 
@@ -121,8 +132,8 @@ This unblocks binary file and socket I/O and the WebSocket server.
   synchronous" limit and is a breaking change.
 - gzip decoding and keep-alive/connection reuse.
 - A Spark HTTP server that serves several clients concurrently with bounded
-  request bodies.
-- A WebSocket keepalive/reconnect helper, once `bytes` lands.
+  request bodies and byte-exact bodies.
+- A WebSocket keepalive/reconnect helper.
 
 ### Ergonomics and protocols
 
@@ -176,11 +187,12 @@ optimization that cannot hold it does not land.
 
 | Decision | Choice |
 | --- | --- |
-| Dependencies | OpenSSL only, for TLS. Deflate vendors its own inflate. |
+| Dependencies | OpenSSL only, for TLS and the crypto natives. Deflate vendors its own inflate. |
 | Breaking changes | Allowed before 1.0, never silent; recorded in `CHANGELOG.md`, the reference and the fixtures in the same commit. |
 | Benchmark gate | `fib(27)` min < 5 ms, plus a per-task target measured with `run_all.py`. |
 | HTTP concurrency | Make the existing client coroutine-aware in place; no parallel async API. |
-| Regex semantics | Move to leftmost-first with lazy quantifiers. |
+| Regex semantics | Leftmost-first with lazy quantifiers and capture groups (landed in phase 23). |
+| Text and bytes | Never converted implicitly (landed in phase 23). |
 | Maps | Insertion order becomes specified. |
 | Editor support | tree-sitter, no LSP in 0.2. |
 | Packaging | Module namespaces in 0.2; manifest, resolver and lockfile later. |

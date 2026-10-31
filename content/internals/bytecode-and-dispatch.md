@@ -28,10 +28,11 @@ Control-flow details:
   `for`, avoiding an extra `POP`.
 - Jumps are emitted with a `0xffff` marker and patched once the target is known.
 - `CLOSURE` is followed by an `(is_local, index)` pair per upvalue.
-- `ITER_KEYS` normalizes a `for-in` iterable: arrays stay as they are, maps
-  become an array of keys, strings become an array of one-character strings.
-  `LEN` leaves the value and pushes its length, which `for-in` uses for its
-  counter.
+- `ITER_KEYS` normalizes a `for-in` iterable: arrays and `bytes` stay as they
+  are — `LEN` and indexing walk bytes in place, so the loop allocates nothing
+  per element — maps become an array of keys, and strings become an array of
+  one-character strings. `LEN` leaves the value and pushes its length, which
+  `for-in` uses for its counter.
 
 ## A compiled function
 

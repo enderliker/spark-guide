@@ -22,7 +22,7 @@ recursion.
 | Limit | Value |
 | --- | --- |
 | Ports | `0..65535` |
-| `recv` / `recv_from` | 16 MiB per call |
+| `recv` / `recv_bytes` / `recv_from` | 16 MiB per call |
 | `recv_line` | 16 MiB maximum; 64 KiB default |
 | TLS `read` | 16 MiB per call |
 | TLS `write` | `INT32_MAX` bytes |
@@ -39,6 +39,22 @@ recursion.
 
 The HTTP client and the WebSocket client fail explicitly when a limit is
 crossed; they do not truncate silently.
+
+## Data and codec limits
+
+| Limit | Value |
+| --- | --- |
+| `read_bytes` | 16 MiB (`max` may lower it, never raise it) |
+| `inflate` / `gunzip` output | 16 MiB (`max` may lower it) |
+| `rand_bytes` | 16 MiB per call |
+| Regex instructions | 1024 per pattern |
+| Regex capture groups | 32 |
+| Regex repetition count | 10,000 |
+| Regex engine steps | 20,000,000 per call |
+
+The codecs and the regex engine raise `ValueError` when a limit is crossed, so a
+crafted input fails instead of exhausting memory or hanging the interpreter.
+See [Files, System and Data](@stdlib/files-and-system).
 
 ## HTTP server library limits
 
@@ -65,10 +81,15 @@ The VM optimizes for a small interpreter, not a JIT:
 ## Benchmarks
 
 `benchmarks/run.py` runs `fib(27)` seven times and reports the minimum and
-median. On an idle development machine the minimum is around **4.9 ms** and the
+median. On an idle development machine the minimum is around **5.0 ms** and the
 median around **5.1 ms**; the project's performance gate is a minimum below
 **5 ms**. CI uses a coarser guard (`--max-ms 100`) because shared runners are
 noisy.
+
+The machine sits close to the gate: the phase 22 and 23 checkpoints measured a
+`fib(27)` minimum between 5.02 and 5.22 ms on a shared WSL2 host. That is the
+noise floor, not a regression — every library phase kept the VM untouched except
+where a native was added, and the gate itself does not move.
 
 `benchmarks/run_all.py` runs the wider set. The baseline recorded for the 0.2
 work (WSL2, shared machine, 2026-10-31) was:
@@ -162,14 +183,16 @@ performance.
 
 ## Tests
 
-The test suite contains 243 tests:
+The test suite contains 340 tests:
 
-- `tests/cases` — valid programs compared against exact `.out` output;
+- `tests/cases` — valid programs compared against exact `.out` output, including
+  the `bytes` core, binary file and socket I/O, the codecs, compression, dates,
+  crypto and the full regex engine;
 - `tests/errors` — failing programs checked for exit code and a `stderr`
   fragment;
 - REPL sessions and CLI flags;
-- local network fixtures, including TLS, WebSockets, HTTP and a mock Discord
-  gateway;
+- local network fixtures, including TLS, WebSockets in both directions, HTTP,
+  the `ws_accept` handshake probes and a mock Discord gateway;
 - a low-`RLIMIT_NOFILE` run that trips descriptor exhaustion.
 
 ```bash

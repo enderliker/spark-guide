@@ -41,7 +41,12 @@ calls `object_free`. Finalizers release external resources:
 - `ObjFile` closes its `FILE *`;
 - `ObjSocket` closes its descriptor (and TLS state);
 - `ObjServer` closes its listening descriptor;
-- `ObjWebSocket` frees its buffers and releases the transport.
+- `ObjWebSocket` frees its buffers and releases the transport;
+- `ObjStringBuilder` and `ObjBytesBuilder` free their growable buffers.
+
+`ObjBytes` values are plain traced objects with an inline payload, so a byte
+buffer is reclaimed exactly like a string, and a `bytes_builder` that becomes
+unreachable releases its buffer at the next sweep.
 
 Explicit `close()` is still preferred; finalization is a safety net, not a
 substitute for deterministic resource management.

@@ -10,12 +10,14 @@ type. `type(x)` reports it.
 | `int` | `42`, `-7`, `0xFF` | `"number"` | always truthy |
 | `number` (float) | `3.14`, `1.5e3` | `"number"` | always truthy |
 | `string` | `"hello"` | `"string"` | always truthy, including `""` |
+| `bytes` | `bytes_from("hi")` | `"bytes"` | always truthy, including `bytes(0)` |
 | `array` | `[1, 2]` | `"array"` | always truthy |
 | `map` | `{"a": 1}` | `"map"` | always truthy |
 | `function` | `fn(x) { ... }`, `print` | `"function"` | always truthy |
 | `class` | `class Point { ... }` | `"class"` | always truthy |
 | instance | `new Point(1, 2)` | the class name | always truthy |
 | `string_builder` | `string_builder()` | `"string_builder"` | always truthy |
+| `bytes_builder` | `bytes_builder()` | `"bytes_builder"` | always truthy |
 | `file` | `open("data.txt")` | `"file"` | always truthy |
 | `coroutine` | `spawn(worker)` | `"coroutine"` | always truthy |
 | `channel` | `channel()` | `"channel"` | always truthy |
@@ -61,12 +63,16 @@ print(is_int(1), is_int(1.0));// true false
 print(int(3.9), float(3));    // 3 3.0
 ```
 
-The global constants `pi` and `nan` are predefined. Following IEEE 754,
+The global constants `pi`, `nan` and `inf` are predefined. Following IEEE 754,
 `nan == nan` is `false`; use `is_nan(x)` to test for it:
 
 ```spark
-print(nan, is_nan(nan), nan == nan);   // nan true false
+print(nan, is_nan(nan), nan == nan);       // nan true false
+print(pi > 3.14, pi < 3.15, inf > 1e308);  // true true true
 ```
+
+`inf` is positive infinity (`-inf` is its negation); `sqrt(-1)` and similar
+domain errors raise `ValueError` rather than producing `nan`.
 
 ## Numeric literals
 
@@ -99,10 +105,10 @@ print(m[1.0]);                   // one — 1 and 1.0 are the same key
 ```
 
 - Numbers use numeric equality, so `1 == 1.0`.
-- Strings compare by content.
+- Strings and `bytes` compare by content.
 - Arrays, maps, functions, instances and resource objects compare by identity.
-- Map keys follow the same rules: content for strings, identity for objects,
-  and canonical numeric equality (`map[1]` is `map[1.0]`).
+- Map keys follow the same rules: content for strings and bytes, identity for
+  objects, and canonical numeric equality (`map[1]` is `map[1.0]`).
 - `nil == nil` is `true`; `nil` is never equal to another type. Comparison with
   `nil` always uses identity, even if a class overloads `__eq__`.
 
@@ -119,6 +125,36 @@ print("spark"[0]);       // s
 Because strings are immutable, `s += x` allocates a new string and copies the
 accumulator. For large builds use `string_builder()`; see
 [Strings](@guide/strings).
+
+## Bytes are binary values
+
+`bytes` is an immutable sequence of byte values, the binary counterpart of
+`string`. It counts positions in bytes, not characters, and it accepts any value
+from `0` to `255` — a string cannot hold a lone `0xFF` byte but a `bytes` value
+can:
+
+```spark
+var abc = bytes_from([97, 98, 99]);      // b"abc"
+var raw = bytes_from("héllo");           // b"h\xc3\xa9llo" — 6 bytes, 5 characters
+print(len(abc), len(raw), type(abc));    // 3 6 bytes
+print(abc[0], abc[-1]);                  // 97 99
+print(abc + bytes_from("d"));            // b"abcd"
+```
+
+- `bytes(n)` builds `n` zero bytes; `bytes_from(array)` takes integers in
+  `0..255`; `bytes_from(string)` copies the string's UTF-8 bytes unchanged.
+- There is no `bytes` literal, so a byte value is always built at run time.
+  `print` and `str` show a `b"..."` preview; `to_string(b)` is the lossless
+  conversion back to text and raises `ValueError` on invalid UTF-8.
+- There is no implicit conversion between `string` and `bytes`: `bytes_from`
+  and `to_bytes` go one way, `to_string` goes the other, and mixing them in
+  arithmetic (for example `bytes + string`) is a `TypeError`.
+- Two `bytes` values compare by content, so they work as map keys; a string and
+  the bytes with the same contents are different keys.
+
+Binary I/O, the base64/hex codecs and compression are documented in
+[Files, System and Data](@stdlib/files-and-system); `bytes_builder()` is the
+mutable companion for assembling byte sequences.
 
 ## Arrays and maps are references
 

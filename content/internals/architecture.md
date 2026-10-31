@@ -41,8 +41,12 @@ The stages are deliberately separate:
 | `chunk.c` | Code, lines and constants arrays; disassembler. |
 | `vm.c` | Stack, frames, closures, natives, errors, GC, scheduler. |
 | `object.c` | Dynamic objects, string interning, arrays, maps, formatting. |
-| `net.c` | Sockets, TLS, URLs, HTTP and WebSocket clients. |
+| `bytes.c` | The `bytes` constructors and `bytes_builder` natives. |
+| `net.c` | Sockets, TLS, URLs, HTTP, and WebSocket clients and servers. |
 | `json.c` / `regex.c` | JSON and regular-expression engines. |
+| `codec.c` | base64/hex codecs and the bounded DEFLATE/gzip decoder. |
+| `crypto.c` | SHA-256, HMAC-SHA256 and the CSPRNG through OpenSSL. |
+| `datetime.c` | Date/time formatting and parsing. |
 | `bytecode.c` | `.sparkc` serialization. |
 | `debugger.c` | Interactive debugger. |
 | `formatter.c` / `linter.c` | Developer tools. |
@@ -88,6 +92,13 @@ Concrete object types include:
 - `ObjString` — FNV-1a hash, length and inline bytes. All strings are
   **interned**, so equal strings share one object and equality can start with a
   pointer comparison.
+- `ObjBytes` — immutable, non-NUL-terminated byte buffer with an inline payload
+  (`unsigned char data[]`). Bytes are **not** interned, so two equal byte
+  sequences are distinct objects that compare equal by content; map hashing and
+  key comparison look inside them. A `bytes` value never reaches the constant
+  pool because the language has no literal for it.
+- `ObjBytesBuilder` — growable `malloc`ed buffer, the mutable companion of
+  `bytes`.
 - `ObjArray` — dynamic array of `Value`.
 - `ObjMap` — open-addressing table with cached hashes, tombstones and
   specialized probing for object and string keys.
@@ -115,6 +126,21 @@ The project considered in-place mutation under uniqueness, rope strings and
 promoting accumulators at compile time, and rejected them for escape-tracking
 risk, flattening cost and hot-path complexity respectively. The explicit
 builder buys the guarantee without changing string semantics.
+
+### Bytes are a sibling of strings, not a reinterpretation
+
+`bytes` is its own `Obj` type with its own constructors in `bytes.c`, rather
+than a flag on `ObjString`. Strings stay interned and UTF-8-validated, which
+their equality, hashing and every text native rely on; bytes are neither
+interned nor validated, and consumers index them 0..255. The two types never
+convert implicitly, so no text native had to grow a binary mode.
+
+The binary path stays inside C: `read_bytes`, `recv_bytes` and the WebSocket
+frame parser hand back `ObjBytes` directly, `codec.c` decodes base64/hex and
+DEFLATE into one, and `crypto.c` returns digests as one. The decoder in
+`codec.c` follows the structure of Mark Adler's puff.c and checks its output
+against a 16 MiB cap while it writes, so a decompression bomb fails before it
+allocates the expanded size.
 
 ## The compiler
 
@@ -240,8 +266,10 @@ reader bounded by the request deadline.
   indentation. Idempotence is tested.
 - **Linter**: a single-pass AST traversal for unused variables, unreachable
   code and shadowing.
-- **Bytecode serialization**: magic `SPRK`, version, active global names, then
-  chunks, line/column tables and constants recursively.
+- **Bytecode serialization**: magic `SPRK`, format version `5`, active global
+  names, then chunks, line/column tables and constants recursively. Constants
+  carry `nil`, `bool`, `int`, `number`, `string` or `function`; there is no
+  `bytes` tag because no `bytes` value can appear in a constant pool.
 
 ## Extending the interpreter
 
@@ -272,8 +300,9 @@ reader bounded by the request deadline.
 - `tests/errors/*.spark` against an exit code and a `stderr` fragment;
 - REPL sessions and the CLI flags (`--version`, `--help`, `--dump`,
   `--compile`, `--debug`, `--format`, `--lint`, bytecode execution);
-- local network fixtures: an HTTP server, an RFC 6455 server, a mock Discord
-  gateway and a low-`RLIMIT_NOFILE` run.
+- local network fixtures: an HTTP server, an RFC 6455 server and client, the
+  `ws_accept` server handshake probes, a mock Discord gateway and a
+  low-`RLIMIT_NOFILE` run.
 
 The suite never contacts the public internet. It also runs under
 AddressSanitizer and UndefinedBehaviorSanitizer, and CI builds with `-Werror`.

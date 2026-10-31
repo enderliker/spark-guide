@@ -157,9 +157,10 @@ deliberately generic.
 
 ::: warning Text server, not a byte server
 Spark strings are UTF-8 text and `Content-Length` is a byte count. The library
-compares it to a character count, which matches only for ASCII bodies. Binary
-requests and responses are unsupported. A `bytes` type is planned; see the
-[roadmap](@appendix/roadmap).
+compares it to a character count, which matches only for ASCII bodies, so it
+serves text APIs. Binary requests and responses are not supported by this
+library, even though the language now has a `bytes` type; a byte-exact version
+is tracked in the [roadmap](@appendix/roadmap).
 :::
 
 ## Concurrency
@@ -220,5 +221,5 @@ with a scripted Python client, so both ends are exercised offline.
 ## Next
 
 - [HTTP Client](@networking/http-client) — the matching client.
-- [WebSockets](@networking/websockets) — the other client protocol in 0.1.0.
+- [WebSockets](@networking/websockets) — RFC 6455 clients and servers.
 - [Modules](@guide/modules) — how `import "./lib/http"` works.
