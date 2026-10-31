@@ -1025,8 +1025,10 @@ def page_shell(
     prev=None,
     next_=None,
     body_class="",
+    root=None,
 ):
-    root = rel_root(current_url)
+    if root is None:
+        root = rel_root(current_url)
     full_title = f"{title} | {SITE['title']}" if title else SITE["title"]
     toc = toc or []
     nav = nav_html(current_url, root)
@@ -1343,10 +1345,13 @@ def build():
         title="Page not found",
         description="The page you are looking for does not exist.",
         current_url="404.html",
+        # Vercel serves this file at whatever URL was requested, so every link
+        # and asset must be root-absolute or it breaks at nested depths.
+        root="/",
         body_html="""<h1 class="page-title">Page not found</h1>
 <p>The page you are looking for does not exist. Try the navigation, or search
 the guide with <kbd>Ctrl</kbd> + <kbd>K</kbd>.</p>
-<p><a class="btn btn-primary" href="index.html">Back to the guide</a></p>""",
+<p><a class="btn btn-primary" href="/index.html">Back to the guide</a></p>""",
     )
     (DIST / "404.html").write_text(not_found, encoding="utf-8")
 
