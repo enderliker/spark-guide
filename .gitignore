@@ -1,0 +1,14 @@
+# Generated site (Vercel rebuilds it from content/ and build.py)
+dist/
+
+# Vercel CLI project link
+.vercel/
+
+# Python
+__pycache__/
+*.pyc
+
+# Editor and OS clutter
+*.tmp.*
+*Zone.Identifier
+.DS_Store
