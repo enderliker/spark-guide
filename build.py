@@ -1114,7 +1114,8 @@ def page_shell(
 {body_html}
 {prev_next}
 <footer class="page-footer">
-  <p>Spark Guide documents Spark {SITE['version']}. Released under the {escape(SITE['license'])} License.</p>
+  <p>Spark Guide documents Spark {SITE['version']}. Text and code are released
+  under the {escape(SITE['license'])} License; the logo is excluded.</p>
   <p class="page-footer__meta">Last updated {escape(SITE['last_updated'])}.
   Spark is <a href="{SITE['repo']}" target="_blank" rel="noopener noreferrer">open source</a>.</p>
 </footer>

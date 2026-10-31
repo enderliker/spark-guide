@@ -63,6 +63,8 @@ dist/                        generated site (rebuild after changing content)
 The icon is used in the navbar and as the favicon; the full lockup heads the
 home page and is inlined so its wordmark can follow the light or dark theme.
 
+The logo files are not MIT licensed; see `assets/logo/LICENSE`.
+
 The palette is taken from the logo:
 
 | Token | Value | Use |
@@ -90,6 +92,12 @@ is optional. Link between pages with `@section/page`, for example
 
 Code fences must name a language: `spark`, `bash`, `text`, `json`, `c`, `csharp`
 or an empty fence for plain text.
+
+## License
+
+The guide, its generator and the site code are released under the MIT License;
+see `LICENSE`. The Spark logo files in `assets/logo/` are excluded and remain
+all rights reserved; see `assets/logo/LICENSE`.
 
 ## Notes
 
