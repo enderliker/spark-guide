@@ -30,9 +30,10 @@ Then open <http://localhost:8000/>.
 
 ## Deploy
 
-The site is hosted on Vercel and deploys automatically from `main`. Vercel runs
-`python3 build.py` and serves `dist/`; no build output is committed. Open a pull
-request to get a preview URL before merging.
+The site is hosted on Vercel at <https://spark-guide.vercel.app/> and deploys
+automatically from `main`. Vercel runs `python3 build.py` and serves `dist/`; no
+build output is committed. Open a pull request to get a preview URL before
+merging.
 
 ```bash
 git push origin main
